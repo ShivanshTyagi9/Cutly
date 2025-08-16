@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>TinyURL — Login</title>
+  <style>
+    :root {
+      --accent: #4fd1c5;
+      --bg-dark: #0e0e0e;
+      --glass-bg: rgba(255, 255, 255, 0.06);
+      --glass-border: rgba(255, 255, 255, 0.12);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: radial-gradient(circle at 10% 20%, #141414, #0b0b0b);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      margin-top: 50px;
+      text-align: center;
+      animation: fadeIn 1s ease-out;
+    }
+    h1 {
+      font-size: 3.5rem;
+      background: linear-gradient(45deg, var(--accent), #9be7ff, white);
+      background-size: 200% 200%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: gradientMove 5s ease infinite;
+    }
+
+    nav {
+      margin-top: 10px;
+      display: flex;
+      justify-content: center;
+      gap: 25px;
+    }
+    nav a {
+      text-decoration: none;
+      color: rgba(255,255,255,0.75);
+      font-weight: 500;
+      position: relative;
+      padding: 5px 10px;
+      transition: color 0.3s ease;
+    }
+    nav a:hover {
+      color: var(--accent);
+    }
+    nav a::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--accent);
+      transform: scaleX(0);
+      transition: transform 0.3s ease;
+    }
+    nav a:hover::after {
+      transform: scaleX(1);
+    }
+
+    .card {
+      margin-top: 60px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(25px);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      padding: 40px;
+      width: min(90%, 450px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+      animation: fadeUp 0.8s ease-out;
+    }
+
+    .card h2 {
+      text-align: center;
+      font-size: 2rem;
+      margin-bottom: 30px;
+      background: linear-gradient(45deg, var(--accent), #9be7ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 700;
+    }
+
+    .form-group {
+      margin-bottom: 25px;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 1rem;
+      letter-spacing: 0.5px;
+      color: rgba(255,255,255,0.9);
+    }
+
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 15px 20px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.05);
+      color: white;
+      font-size: 1rem;
+      outline: none;
+      transition: border 0.3s, box-shadow 0.3s;
+    }
+    input[type="text"]:focus, input[type="password"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 15px rgba(79,209,197,0.5);
+    }
+    input[type="text"]::placeholder, input[type="password"]::placeholder {
+      color: rgba(255,255,255,0.4);
+    }
+
+    button {
+      width: 100%;
+      padding: 15px 25px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(45deg, var(--accent), #00bcd4);
+      color: white;
+      font-weight: 700;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.3s;
+      position: relative;
+      margin-top: 10px;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(0,255,230,0.4);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .link-section {
+      margin-top: 25px;
+      text-align: center;
+      padding: 20px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(25px);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+    }
+    
+    .link-section p {
+      color: rgba(255,255,255,0.75);
+      margin-bottom: 10px;
+    }
+    
+    .link-section a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.3s ease;
+    }
+    .link-section a:hover {
+      color: #9be7ff;
+      text-decoration: underline;
+    }
+
+    .flash-messages {
+      margin-top: 20px;
+      max-width: min(90%, 450px);
+      width: 100%;
+    }
+
+    .flash-message {
+      padding: 15px 20px;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    .flash-message.error {
+      background: rgba(255, 80, 80, 0.1);
+      border: 1px solid rgba(255, 80, 80, 0.3);
+      color: #ff6b6b;
+    }
+
+    .flash-message.success {
+      background: rgba(80, 255, 120, 0.1);
+      border: 1px solid rgba(80, 255, 120, 0.3);
+      color: #51cf66;
+    }
+
+    .flash-message.info {
+      background: rgba(80, 120, 255, 0.1);
+      border: 1px solid rgba(80, 120, 255, 0.3);
+      color: #339af0;
+    }
+
+    /* Animations */
+    @keyframes gradientMove {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 2.5rem;
+      }
+      .card {
+        padding: 30px 25px;
+        margin-top: 40px;
+      }
+      .card h2 {
+        font-size: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>TinyURL</h1>
+    <!-- <nav>
+      <a href="/">Shorten</a>
+      <a href="/list">All URLs</a>
+    </nav> -->
+  </header>
+
+  <div class="card">
+    <h2>Create Account</h2>
+    
+    <form method="POST">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" name="username" id="username" placeholder="Enter your username" required>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" name="password" id="password" placeholder="Enter your password" required>
+      </div>
+
+      <button type="submit">Sign Up</button>
+    </form>
+  </div>
+
+  <div class="link-section">
+    <p>Already have an account?</p>
+    <a href="{{ url_for('login') }}">Log In</a>
+  </div>
+
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-messages">
+        {% for category, message in messages %}
+          <div class="flash-message {{ category }}">
+            <strong>{{ message }}</strong>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <script>
+    // Add subtle form validation animations
+    document.querySelectorAll('input').forEach(input => {
+      input.addEventListener('invalid', function() {
+        this.style.borderColor = '#ff6b6b';
+        this.style.boxShadow = '0 0 15px rgba(255, 107, 107, 0.5)';
+      });
+      
+      input.addEventListener('input', function() {
+        if (this.checkValidity()) {
+          this.style.borderColor = 'var(--accent)';
+          this.style.boxShadow = '0 0 15px rgba(79,209,197,0.3)';
+        }
+      });
+    });
+
+    // Auto-hide flash messages after 5 seconds
+    document.querySelectorAll('.flash-message').forEach(message => {
+      setTimeout(() => {
+        message.style.opacity = '0';
+        message.style.transform = 'translateX(-20px)';
+        setTimeout(() => {
+          message.remove();
+        }, 300);
+      }, 5000);
+    });
+  </script>
+</body>
+</html>

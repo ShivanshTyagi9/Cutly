@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>TinyURL — Shorten</title>
+  <style>
+    :root {
+      --accent: #4fd1c5;
+      --bg-dark: #0e0e0e;
+      --glass-bg: rgba(255, 255, 255, 0.06);
+      --glass-border: rgba(255, 255, 255, 0.12);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: radial-gradient(circle at 10% 20%, #141414, #0b0b0b);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      margin-top: 50px;
+      text-align: center;
+      animation: fadeIn 1s ease-out;
+    }
+    h1 {
+      font-size: 3.5rem;
+      background: linear-gradient(45deg, var(--accent), #9be7ff, white);
+      background-size: 200% 200%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: gradientMove 5s ease infinite;
+    }
+
+    nav {
+      margin-top: 10px;
+      display: flex;
+      justify-content: center;
+      gap: 25px;
+    }
+    nav a {
+      text-decoration: none;
+      color: rgba(255,255,255,0.75);
+      font-weight: 500;
+      position: relative;
+      padding: 5px 10px;
+      transition: color 0.3s ease;
+    }
+    nav a:hover {
+      color: var(--accent);
+    }
+    nav a::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--accent);
+      transform: scaleX(0);
+      transition: transform 0.3s ease;
+    }
+    nav a:hover::after {
+      transform: scaleX(1);
+    }
+
+    .card {
+      margin-top: 60px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(25px);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      padding: 40px;
+      width: min(90%, 600px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+      animation: fadeUp 0.8s ease-out;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 15px;
+      font-size: 1.2rem;
+      letter-spacing: 1px;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 10px;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 15px 20px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.05);
+      color: white;
+      font-size: 1rem;
+      outline: none;
+      transition: border 0.3s, box-shadow 0.3s;
+    }
+    input[type="text"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 15px rgba(79,209,197,0.5);
+    }
+    input[type="text"]::placeholder {
+      color: rgba(255,255,255,0.4);
+    }
+
+    button {
+      padding: 15px 25px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(45deg, var(--accent), #00bcd4);
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.3s;
+      position: relative;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(0,255,230,0.4);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    #result {
+      margin-top: 25px;
+      padding: 25px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(25px);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      transition: all 0.4s ease;
+      margin-bottom: 0;
+    }
+    #result.show {
+      max-height: 200px;
+      opacity: 1;
+      margin-bottom: 25px;
+    }
+    #result p {
+      margin-bottom: 15px;
+      color: white;
+      font-weight: 600;
+      font-size: 1.1rem;
+      letter-spacing: 0.5px;
+    }
+    
+    .result-content {
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+    }
+    
+    #short-url {
+      flex: 1;
+      color: white;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      padding: 15px 20px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      transition: all 0.3s ease;
+      word-break: break-all;
+      min-height: 50px;
+    }
+    #short-url:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: var(--accent);
+      box-shadow: 0 0 15px rgba(79,209,197,0.3);
+      text-decoration: none;
+    }
+
+    .copy-btn {
+      padding: 15px 25px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(45deg, var(--accent), #00bcd4);
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.3s;
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+    .copy-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(0,255,230,0.4);
+    }
+    .copy-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .error {
+      margin-top: 15px;
+      padding: 15px;
+      background: rgba(255,80,80,0.1);
+      border: 1px solid rgba(255,80,80,0.3);
+      border-radius: 12px;
+      color: #ff6b6b;
+      display: none;
+    }
+
+    .tip {
+      background: rgba(0,0,0,0.3);
+      border-radius: 12px;
+      font-size: 0.95rem;
+      color: rgba(255,255,255,0.75);
+      padding: 15px;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 8px;
+    }
+
+    /* Animations */
+    @keyframes gradientMove {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 600px) {
+      .input-group {
+        flex-direction: column;
+      }
+      button {
+        width: 100%;
+      }
+    }
+    .logout-corner-btn {
+  position: absolute;
+  top: 28px;
+  right: 40px;
+  background: transparent;
+  color: #ff4444;
+  border: none;
+  font-weight: 700;
+  font-size: 1.1rem;
+  padding: 8px 22px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.2s, background 0.2s;
+  z-index: 100;
+}
+.logout-corner-btn:hover {
+  color: #fff;
+  background: #ff4444;
+}
+  </style>
+</head>
+<body>
+  <a href="/logout" class="logout-corner-btn">Logout</a>
+  <header>
+    <h1>TinyURL</h1>
+    <nav>
+      <a href="/">Shorten</a>
+      <a href="/list">All URLs</a>
+  </header>
+
+  <div class="card">
+    <form id="shorten-form">
+      <label for="url">Transform Your Link</label>
+      <div class="input-group">
+        <input id="url" type="text" name="url" placeholder="https://example.com/very/long/link" required />
+        <button type="submit" id="submit-btn">Compress</button>
+      </div>
+    </form>
+
+    <div id="error" class="error">
+      <p id="error-message"></p>
+    </div>
+
+    <div id="result">
+      <p>Your shortened URL:</p>
+      <div class="result-content">
+        <a id="short-url" href="#" target="_blank"></a>
+        <button class="copy-btn" id="copy-btn" onclick="copyToClipboard()">Copy</button>
+      </div>
+    </div>
+
+    <div class="tip">
+      💡 Developer API: Use <code>POST /shorten</code> with JSON <code>{"url": "https://..."}</code>
+    </div>
+  </div>
+
+  <script>
+    function showError(message) {
+      const errorDiv = document.getElementById("error");
+      const errorMessage = document.getElementById("error-message");
+      errorMessage.textContent = message;
+      errorDiv.style.display = "block";
+      
+      // Hide after 5 seconds
+      setTimeout(() => {
+        errorDiv.style.display = "none";
+      }, 5000);
+    }
+
+    function hideError() {
+      document.getElementById("error").style.display = "none";
+    }
+
+    function showResult(shortUrl) {
+      const resultDiv = document.getElementById("result");
+      const shortUrlElement = document.getElementById("short-url");
+      
+      shortUrlElement.href = shortUrl;
+      shortUrlElement.textContent = shortUrl;
+      resultDiv.classList.add("show");
+    }
+
+    function hideResult() {
+      document.getElementById("result").classList.remove("show");
+    }
+
+    async function copyToClipboard() {
+      const shortUrl = document.getElementById("short-url").textContent;
+      const copyBtn = document.getElementById("copy-btn");
+      
+      try {
+        await navigator.clipboard.writeText(shortUrl);
+        const originalText = copyBtn.textContent;
+        copyBtn.textContent = "Copied! ✓";
+        copyBtn.style.background = "rgba(79,209,197,0.3)";
+        
+        setTimeout(() => {
+          copyBtn.textContent = originalText;
+          copyBtn.style.background = "";
+        }, 2000);
+      } catch (err) {
+        // Fallback for browsers that don't support clipboard API
+        const textArea = document.createElement('textarea');
+        textArea.value = shortUrl;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        copyBtn.textContent = "Copied! ✓";
+        setTimeout(() => {
+          copyBtn.textContent = "Copy";
+        }, 2000);
+      }
+    }
+
+    document.getElementById("shorten-form").addEventListener("submit", async function(event) {
+      event.preventDefault();
+      
+      const urlInput = document.getElementById("url");
+      const submitBtn = document.getElementById("submit-btn");
+      const url = urlInput.value.trim();
+      
+      if (!url) {
+        showError("Please enter a URL");
+        return;
+      }
+
+      // Hide previous results/errors
+      hideError();
+      hideResult();
+      
+      // Show loading state
+      submitBtn.innerHTML = '<span class="loading"></span>Compressing...';
+      submitBtn.disabled = true;
+
+      try {
+        const response = await fetch("/shorten", {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify({ url: url })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.shortened_url) {
+          showResult(data.shortened_url);
+          urlInput.value = ""; // Clear the input
+        } else {
+          showError(data.error || "Something went wrong. Please try again.");
+        }
+      } catch (err) {
+        showError("Network error. Please check your connection and try again.");
+        console.error("Request failed:", err);
+      } finally {
+        // Reset button state
+        submitBtn.innerHTML = "Compress";
+        submitBtn.disabled = false;
+      }
+    });
+
+    // Clear error when user starts typing
+    document.getElementById("url").addEventListener("input", hideError);
+  </script>
+</body>
+</html>
