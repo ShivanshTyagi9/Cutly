@@ -3,86 +3,106 @@ from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 import random, string
 import psycopg2
+from psycopg2 import pool
 import os
 
+db_pool = None
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
-bcrypt = Bcrypt(app)
-login_manager = LoginManager(app)
-login_manager.login_view = "login"
+app.secret_key = os.urandom(24) # random key for session
+bcrypt = Bcrypt(app) # password hash
+login_manager = LoginManager(app) # manage sessions
+login_manager.login_view = "login" # redirect to login if logged out
 
-# In-memory database
-url_map = {}
-
+#User class for login
 class User(UserMixin):
     def __init__(self, id, username, password):
         self.id = id
         self.username = username
         self.password = password
 
+# Loader for login
 @login_manager.user_loader
 def load_user(user_id):
-    link = db_setup()
+    link = get_db_link()
     cursor = link.cursor()
     cursor.execute("SELECT id, username, password FROM users WHERE id = %s", (user_id,))
     row = cursor.fetchone()
     cursor.close()
-    link.close()
+    put_db_link(link)
     if row:
         return User(*row)
     return None
 
-def db_setup():
-    try:
-        link = psycopg2.connect(
-            host="localhost",
-            database="tinyurl",
-            user="postgres",  
-            password="Cosmic09",
-            port=5432
-        )
-        print("Connected to PostgreSQL successfully!")
-        return link
+# Db connection pool
+def db_pool_setup():
+    global db_pool
+    if db_pool is None:
+        try:
+            db_pool = psycopg2.pool.SimpleConnectionPool(
+                1, 20,
+                host="localhost",
+                database="tinyurl",
+                user="postgres",  
+                password="Cosmic09",
+                port=5432
+            )
+            print("Connected to PostgreSQL successfully!")
+        except psycopg2.Error as e:
+            print(f"Error connecting to PostgreSQL: {e}")
 
-    except psycopg2.Error as e:
-        print(f"Error connecting to PostgreSQL: {e}")
+#get a connection from pool
+def get_db_link():
+    return db_pool.getconn()
 
+# return connection to pool
+def put_db_link(link):
+    db_pool.putconn(link)
+
+# Initialize database if it doesn't exist
 def db_init():
-    link = db_setup()
+    link = get_db_link()
     cursor = link.cursor()
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS urls (
             id SERIAL PRIMARY KEY,
             code TEXT UNIQUE NOT NULL,
             long_url TEXT NOT NULL,
+            user_id INTEGER NOT NULL REFERENCES users(id),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             clicks INTEGER DEFAULT 0
-        )
+        );
     """)
     link.commit()
-    link.close()
     cursor.close()
+    put_db_link(link)
+    
 
 def save_url_to_db(code, long_url,user_id):
-    link = db_setup()
+    link = get_db_link()
     cursor = link.cursor()
     cursor.execute("INSERT INTO urls (code, long_url,user_id) VALUES (%s, %s,%s)", (code, long_url, user_id))
     link.commit()
-    link.close()
     cursor.close()
+    put_db_link(link)
 
 def fetch_url_from_db(code):
-    link = db_setup()
+    link = get_db_link()
     cursor = link.cursor()
    
     cursor.execute("SELECT long_url FROM urls WHERE code = %s", (code,))
     row = cursor.fetchone()
-    link.close()
     cursor.close()
+    put_db_link(link)
     return row[0] if row else None
 
 def fetch_all_urls():
-    link = db_setup()
+    link = get_db_link()
     cursor = link.cursor()
     cursor.execute("""
                     SELECT code, long_url, created_at, clicks
@@ -90,15 +110,18 @@ def fetch_all_urls():
                     ORDER BY created_at DESC
                     LIMIT 100
                 """, (current_user.id,))
-    return cursor.fetchall()
+    rows = cursor.fetchall()
+    cursor.close()
+    put_db_link(link)
+    return rows
 
 def delete_url(code):
-    link = db_setup()
+    link = get_db_link()
     cursor = link.cursor()
     cursor.execute("DELETE FROM urls WHERE code = %s", (code,))
     link.commit()
-    link.close()
     cursor.close()
+    put_db_link(link)
 
 def generate_short_code():
     url_length = 6
@@ -112,12 +135,12 @@ def is_valid_url(u: str) -> bool:
     return u.startswith(("http://", "https://"))
 
 def update_click_count(code):
-    link = db_setup()   
+    link = get_db_link()   
     cursor = link.cursor()
     cursor.execute("UPDATE urls SET clicks = clicks + 1 WHERE code = %s", (code,))
     link.commit()
-    link.close()
     cursor.close()
+    put_db_link(link)
     ...
 
 @app.route('/shorten', methods=['POST'])
@@ -139,7 +162,6 @@ def shorten_url():
     ...
 
 @app.route('/<code>')
-@login_required
 def redirect_to_url(code):
     url = fetch_url_from_db(code)
     if url:
@@ -196,7 +218,6 @@ def shorten_form():
 @login_required
 def list_urls():
     rows = fetch_all_urls()
-    # Precompute short links for the template
     base = request.host_url.rstrip("/")
     data = [
         {
@@ -219,12 +240,12 @@ def signup():
         username = request.form["username"]
         password = bcrypt.generate_password_hash(request.form["password"]).decode("utf-8")
 
-        conn = db_setup()
-        cur = conn.cursor()
+        link = get_db_link()
+        cursor = link.cursor()
         try:
-            cur.execute("INSERT INTO users (username, password) VALUES (%s, %s) RETURNING id", (username, password))
-            user_id = cur.fetchone()[0]
-            conn.commit()
+            cursor.execute("INSERT INTO users (username, password) VALUES (%s, %s) RETURNING id", (username, password))
+            user_id = cursor.fetchone()[0]
+            link.commit()
             user = User(user_id, username, password)
             login_user(user)
             flash("Signup successful!", "success")
@@ -232,8 +253,8 @@ def signup():
         except Exception as e:
             flash(f"Signup failed: {e}", "error")
         finally:
-            cur.close()
-            conn.close()
+            cursor.close()
+            put_db_link(link)
 
     return render_template("signup.html")
 
@@ -243,12 +264,12 @@ def login():
         username = request.form["username"]
         password = request.form["password"]
 
-        conn = db_setup()
-        cur = conn.cursor()
-        cur.execute("SELECT id, username, password FROM users WHERE username = %s", (username,))
-        row = cur.fetchone()
-        cur.close()
-        conn.close()
+        link = get_db_link()
+        cursor = link.cursor()
+        cursor.execute("SELECT id, username, password FROM users WHERE username = %s", (username,))
+        row = cursor.fetchone()
+        cursor.close()
+        put_db_link(link)
 
         if row and bcrypt.check_password_hash(row[2], password):
             user = User(*row)
@@ -269,5 +290,6 @@ def logout():
 
 
 if __name__ == "__main__":
+    db_pool_setup()
     db_init()
     app.run(host="0.0.0.0", port=5000)
