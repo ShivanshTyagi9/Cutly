@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: localpw
+      POSTGRES_DB: cutly
+    ports: ["5432:5432"]
+
+  redis:
+    image: redis:7
+    command: ["--appendonly","yes"]
+    ports: ["6379:6379"]
+
+  web:
+    image: cosmic09/cutly:v1
+    build: .
+    ports: ["5000:5000"]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: cutly
+      DB_USER: postgres
+      DB_PASSWORD: localpw
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      SESSION_SECRET: dev-secret-please-change
+    depends_on: [postgres, redis]

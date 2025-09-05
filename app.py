@@ -4,11 +4,25 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 import random, string
 import psycopg2
 from psycopg2 import pool
+import redis
 import os
 
+
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = int(os.getenv("DB_PORT"))
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+
+REDIS_HOST = os.getenv("REDIS_HOST")
+REDIS_PORT = int(os.getenv("REDIS_PORT"))
+SESSION_SECRET = os.getenv("SESSION_SECRET")
+
+
 db_pool = None
+redis_client = redis.StrictRedis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 app = Flask(__name__)
-app.secret_key = os.urandom(24) # random key for session
+app.secret_key = SESSION_SECRET # random key for session
 bcrypt = Bcrypt(app) # password hash
 login_manager = LoginManager(app) # manage sessions
 login_manager.login_view = "login" # redirect to login if logged out
@@ -19,6 +33,8 @@ class User(UserMixin):
         self.id = id
         self.username = username
         self.password = password
+
+
 
 # Loader for login
 @login_manager.user_loader
@@ -40,11 +56,11 @@ def db_pool_setup():
         try:
             db_pool = psycopg2.pool.SimpleConnectionPool(
                 1, 20,
-                host="localhost",
-                database="tinyurl",
-                user="postgres",  
-                password="Cosmic09",
-                port=5432
+                host=DB_HOST,
+                database=DB_NAME,
+                user=DB_USER,  
+                password=DB_PASSWORD,
+                port=DB_PORT
             )
             print("Connected to PostgreSQL successfully!")
         except psycopg2.Error as e:
@@ -52,6 +68,9 @@ def db_pool_setup():
 
 #get a connection from pool
 def get_db_link():
+    global db_pool
+    if db_pool is None:
+        db_pool_setup()
     return db_pool.getconn()
 
 # return connection to pool
@@ -87,11 +106,21 @@ def save_url_to_db(code, long_url,user_id):
     link = get_db_link()
     cursor = link.cursor()
     cursor.execute("INSERT INTO urls (code, long_url,user_id) VALUES (%s, %s,%s)", (code, long_url, user_id))
+    try:
+        redis_client.setex(code, 3600, long_url)
+        print(f"URL {long_url} cached in Redis with code {code}")
+    except redis.RedisError as e:
+        print(f"Error caching URL in Redis: {e}")
     link.commit()
     cursor.close()
     put_db_link(link)
 
 def fetch_url_from_db(code):
+    # First check Redis cache
+    cached_url = redis_client.getex(code,ex=3600)
+    if cached_url:
+        print(f"URL {cached_url} fetched from Redis cache for code {code}")
+        return cached_url
     link = get_db_link()
     cursor = link.cursor()
    
@@ -179,6 +208,9 @@ def delete_short_url(code):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route("/healthz")
+def healthz():
+    return {"status": "ok"}, 200
 # -----------------------
 # Routes: Web UI
 # -----------------------
